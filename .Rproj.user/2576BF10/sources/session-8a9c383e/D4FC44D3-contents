@@ -183,6 +183,7 @@ epqac <- lapply(files, function(f) {
  
  #Save analysis dataset
  saveRDS(dosing_wd, "output/dosing_wd.rds")
+ saveRDS(dosing_lg, "output/dosing_lg.rds")
  
  
  summary(dosing_wd)
