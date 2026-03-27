@@ -1,0 +1,31 @@
+"STUDYID","DOMAIN","VISITNUM","VISIT","VISITDY","ARMCD","ARM","TVSTRL","TVENRL"
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"","",\N,"",\N,"","","",\N
+"EPQAC","TV","1","Day 0","1","","","weight, mid upper arm circumference (MUAC) and axillary temperature, and capillary blood samples collected, malaria slides prepared and dried blood spots (DBS) stored, drug administration",\N
+"EPQAC","TV","1","Day 0","1","PER CLIN GUIDE","Per Clinical Guidelines","weight, mid upper arm circumference (MUAC) and axillary temperature, and capillary blood samples collected",\N
+"EPQAC","TV","2","Day 1","2","","","drug administration",\N
+"EPQAC","TV","2","Day 1","2","PER CLIN GUIDE","Per Clinical Guidelines","no drug administration",\N
+"EPQAC","TV","3","Day 2","3","","","drug administration",\N
+"EPQAC","TV","3","Day 2","3","PER CLIN GUIDE","Per Clinical Guidelines","no drug administration",\N
+"EPQAC","TV","4","Day 7","8","","","Subjects were reviewed, malaria slides were prepared and dried blood spots (DBS) were stored on Whatman 31 ET Chromatography filter paper (Cat. No. 3031-915)",\N
+"EPQAC","TV","5","Day 14","15","","","Subjects were reviewed, malaria slides were prepared and dried blood spots (DBS) were stored on Whatman 31 ET Chromatography filter paper (Cat. No. 3031-915)",\N
+"EPQAC","TV","6","Day 21","22","","","Subjects were reviewed, malaria slides were prepared and dried blood spots (DBS) were stored on Whatman 31 ET Chromatography filter paper (Cat. No. 3031-915)",\N
+"EPQAC","TV","7","Day 28","29","","","Subjects were reviewed, malaria slides were prepared and dried blood spots (DBS) were stored on Whatman 31 ET Chromatography filter paper (Cat. No. 3031-915)",\N
+"JWJEF","TV","1","Day 0","1","SP-AQ","SULFADOXINE PYRIMETHAMINE AMODIAQUINE","first drug administration",\N
+"JWJEF","TV","2","Day 1","2","SP-AQ","SULFADOXINE PYRIMETHAMINE AMODIAQUINE","second drug administration",\N
+"JWJEF","TV","3","Day 2","3","SP-AQ","SULFADOXINE PYRIMETHAMINE AMODIAQUINE","third drug administration",\N
+"SPSNX","TV","1","Baseline",\N,"","","Baseline questionnaire of characteristics completed and confirmation of malaria by RDT or microscopy. PfDHFR and K13 mutations measured via cross-sectional surveys.",\N
+"SPSNX","TV","2","Day 0",\N,"","","Dose 1 SPAQ and DHAPPQ.",\N
+"SPSNX","TV","3","Day 1",\N,"","","Dose 2 SPAQ and DHAPPQ",\N
+"SPSNX","TV","4","Day 2",\N,"","","Dose 3 SPAQ and DHAPPQ",\N
