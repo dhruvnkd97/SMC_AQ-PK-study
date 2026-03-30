@@ -188,6 +188,10 @@ epqac <- lapply(files, function(f) {
  
  summary(dosing_wd)
  
+ #Load analysis datasets
+ dosing_wd <- load("output/dosing_wd.rds")
+
+ 
  
  #Age vs AQ (mg/kg)
  ggplot(dm_vs, aes(x = age, y = aq_dose_mgkg)) +
