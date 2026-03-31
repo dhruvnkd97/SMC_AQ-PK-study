@@ -8,6 +8,7 @@ library(tidyverse)
 library(iddoverse)
 library(labelled)
 library(ggplot2)
+library(GGally)
 
 
 #Clean SDTM dataset by each domain 
@@ -154,30 +155,50 @@ epqac <- lapply(files, function(f) {
           
           dosing_lg$aq_dose <- as.character(dosing_lg$aq_dose,
                                             levels = c(75, 150),
-                                            labels = c("75mg", "150mg"))
+                                            labels = c("75mg (<12 months)", 
+                                                       "150mg (12-60 months)"))
  
+          
+          ##***** NEED TO CLEAN THE VARIABLE LABELS HERE *** ###
+          
+  
+ #Log-transformed drug concentrations
+          dosing_lg$log_deaq <- log(dosing_lg$deaq)
+          dosing_lg$log_aq <- log(dosing_lg$aq)
+          dosing_lg$log_ppq <- log(dosing_lg$ppq)
+          dosing_lg$log_pyr <- log(dosing_lg$pyr)
+          dosing_lg$log_sfdxn <- log(dosing_lg$sfdxn)
+ 
+ #Recode AQ dose
+          dosing_lg$aq_agedose <- recode(dosing_lg$aq_dose,
+                                      "150" = "150mg (12-60 months)",
+                                      "75" = "75mg (<12 months)")
+                                      
+                   
+          
  #Label variables
  labels <- c(
    age = "Age (months)",
    aq_dose = "AQ daily dose (mg)",
+   aq_agedose = "AQ daily age-based dose (mg)",
    aq_dose_total = "AQ total dose (mg)",
    aq_dose_mgkg = "AQ dose (mg/kg)",
    weight = "Weight (kg)",
-   muac = "MUAC (cm)",
-   `aq_Day 7` = "Day 7 AQ (ng/mL)",
-   `aq_Day 28` = "Day 28 AQ (ng/mL)",
-   `deaq_Day 7` = "Day 7 DEAQ (ng/mL)",
-   `deaq_Day 28` = "Day 28 DEAQ (ng/mL)",
-   `ppq_Day 7` = "Day 7 PPQ (ng/mL)",
-   `ppq_Day 28` = "Day 28 PPQ (ng/mL)",
-   `pyr_Day 7` = "Day 7 PYR (ng/mL)",
-   `pyr_Day 28` = "Day 28 PYR (ng/mL)",
-   `sfdxn_Day 7` = "Day 7 SFDXN (ng/mL)",
-   `sfdxn_Day 28` = "Day 28 SFDXN (ng/mL)"
+   muac = "MUAC (cm)"#,
+  # `aq_Day 7` = "Day 7 AQ (ng/mL)",
+  #`aq_Day 28` = "Day 28 AQ (ng/mL)",
+  # `deaq_Day 7` = "Day 7 DEAQ (ng/mL)",
+  # `deaq_Day 28` = "Day 28 DEAQ (ng/mL)",
+  # `ppq_Day 7` = "Day 7 PPQ (ng/mL)",
+  # `ppq_Day 28` = "Day 28 PPQ (ng/mL)",
+  # `pyr_Day 7` = "Day 7 PYR (ng/mL)",
+  # `pyr_Day 28` = "Day 28 PYR (ng/mL)",
+  # `sfdxn_Day 7` = "Day 7 SFDXN (ng/mL)",
+  # `sfdxn_Day 28` = "Day 28 SFDXN (ng/mL)"
  )
  
  for (var in names(labels)) {
-   var_label(dosing_wd[[var]]) <- labels[[var]]
+   var_label(dosing_lg[[var]]) <- labels[[var]]
  }
  
  
@@ -189,42 +210,142 @@ epqac <- lapply(files, function(f) {
  summary(dosing_wd)
  
  
+ ##***** START ANALYSES HERE ***
+ 
+ 
+ #Load analysis datasets
+ dosing_wd <- readRDS("output/dosing_wd.rds")
+ dosing_lg <- readRDS("output/dosing_lg.rds")
+ 
+ ggpairs(dosing_wd)
+ 
  #Age vs AQ (mg/kg)
- ggplot(dm_vs, aes(x = age, y = aq_dose_mgkg)) +
-   geom_point()
- #Weight vs AQ (mg/kg)
- ggplot(dm_vs, aes(x = weight, y = aq_dose_mgkg)) +
-   geom_point()
+ ggplot(dosing_wd, aes(x = age, y = aq_dose_mgkg)) +
+   geom_point() +
+   labs(title = "AQ exposure vs age",
+        x = "Age (months)", 
+        y = "AQ exposure (mg/kg)", 
+        )
  
  #Weight vs AQ (mg/kg)
- ggplot(dm_vs, aes(x = age, y = weight)) +
-   geom_point()
+ ggplot(dosing_wd, aes(x = weight, y = aq_dose_mgkg)) +
+   geom_point() +
+   labs(title = "AQ exposure vs weight",
+        x = "Weight (kg)", 
+        y = "AQ exposure (mg/kg)", 
+   )
+ 
  
  #Weight vs AQ (mg/kg)
- ggplot(dm_vs, aes(x = weight, y = muac)) +
-   geom_point()
+ ggplot(dosing_wd, aes(x = age, y = weight)) +
+   geom_point() +
+   labs(title = "Age vs weight",
+        x = "Age (months)", 
+        y = "Weight (kg)", 
+   )
  
- #Age vs DEAQ day 28
- ggplot(dosing_wd, aes(x = age, y = `deaq_Day 28`)) +
-   geom_point()
  
- boxplot(dosing_wd$`deaq_Day 28`)
+ #Weight vs MUAC
+ ggplot(dosing_wd, aes(x = weight, y = muac)) +
+   geom_point() +
+   labs(title = "Weight vs MUAC",
+        x = "Age (months)", 
+        y = "Weight (kg)", 
+   )
  
+ 
+ 
+ 
+ #Raw PK drug concentrations
 
- ggplot(dosing_wd, aes(x = "", y = `deaq_Day 28`)) +
-   geom_boxplot() +
-   geom_jitter(aes(color = factor(aq_dose)),
-               width = 0.1, alpha = 0.6) +
-   labs(x = NULL, color = "AQ dose")
- 
+  #Checking raw level count
+ table(dosing_lg$aq_dose, useNA = "ifany")
+ table(dosing_wd$aq_dose, useNA = "ifany")
 
+ #Median DEAQ concentrations by AQ dose
+ med_deaq28 <- dosing_lg %>%
+   filter(TIME == "Day 28", !is.na(aq_agedose), !is.na(deaq)) %>%
+   group_by(aq_agedose) %>%
+   summarise(med_deaq = median(deaq))
  
-
- ggplot(dosing_lg, aes(x = TIME, y = `deaq`)) +
+ med_deaq7 <- dosing_lg %>%
+   filter(TIME == "Day 7", !is.na(aq_agedose), !is.na(deaq)) %>%
+   group_by(aq_agedose) %>%
+   summarise(med_deaq = median(deaq))
+ 
+ 
+ #Boxplot / jitterplot for DEAQ concentrations by AQ dose
+ ggplot(dosing_lg %>% filter(TIME == "Day 28", !is.na(aq_agedose), !is.na(deaq)), 
+        aes(x = TIME, y = `deaq`)) +
    geom_boxplot(outlier.shape = NA) +
-   geom_jitter(aes(color = aq_dose),
+   geom_jitter(aes(color = aq_agedose),
                width = 0.1, alpha = 0.6) +
-   labs(x = "Day", y = "DEAQ (ng/mL)", color = "AQ dose")
+   labs(x = "", 
+        y = "DEAQ concentration (ng/mL)", 
+        color = "AQ age-based\ndose (daily)")
+ 
+ 
+ #Histogram of DEAQ concentrations by AQ dose
+ ggplot(dosing_lg %>% filter(TIME == "Day 28", !is.na(aq_agedose), !is.na(deaq)), 
+        aes(x = deaq, fill = factor(aq_agedose))) +
+   geom_histogram(binwidth = 20, 
+                  position = "identity",
+                  alpha = 0.5,
+                  color = "white") +
+   geom_vline(data = med_deaq28,
+              aes(xintercept = med_deaq),
+              linetype = "dashed",
+              color = "black",
+              linewidth = 1
+              ) +
+   geom_text(data = med_deaq28,
+             aes(x = med_deaq,
+                 y = 175,
+                 label = round(med_deaq, 1)),
+                 color = "black",
+                 hjust = -0.05 #moves test slightly away from line
+   ) +
+   labs(title = "Day 28 DEAQ by AQ dose",
+        x = "DEAQ concentration (ng/mL)", 
+        y = "Number of particpants",
+        fill = "AQ age-based\ndose (daily)")
+   
+ 
+ 
+
+ #Boxplots log DEAQ by AQ dose / Age on Day 7 and Day 28
+ ggplot(dosing_lg %>% filter (!is.na(aq_agedose), !is.na(deaq)), 
+        aes(x = TIME, y = `log_deaq`)) +
+   geom_boxplot(outlier.shape = NA) +
+   geom_jitter(aes(color = aq_agedose),
+               width = 0.1, alpha = 0.6) +
+   labs(title = "Log DEAQ by AQ dose",
+        x = "", 
+        y = "log [DEAQ] (ng/mL)", 
+        color = "AQ age-based\ndose (daily)")
+ 
+ 
+ #Age vs DEAQ day 7 and day 28 drug concentrations
+ ggplot(dosing_wd, aes(x = age)) +
+  # geom_point(aes(y = `deaq_Day 28`), color = "black") +
+   geom_point(aes(y = `deaq_Day 7`), color = "red") + 
+   scale_x_continuous(breaks = seq(0, 60, by = 12)) +
+   labs(y = "DEAQ concentration (ng/mL)", x = "Age (months)")
+ 
+ 
+ #Weight vs DEAQ day 7 and day 28 drug concentrations
+ ggplot(dosing_wd, aes(x = weight)) +
+   geom_point(aes(y = `deaq_Day 28`), color = "black") +
+   geom_point(aes(y = `deaq_Day 7`), color = "red") + 
+   labs(y = "DEAQ concentration (ng/mL)", x = "Weight (kg)")
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  
  
