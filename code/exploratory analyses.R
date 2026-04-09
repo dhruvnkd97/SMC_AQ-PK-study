@@ -14,20 +14,31 @@ library(GGally)
 #Clean SDTM dataset by each domain 
 files <- list.files("data/raw", pattern = "\\.csv$", full.names = TRUE)
 
-#Keep only EPQAC data
-epqac <- lapply(files, function(f) {
-  read.csv(f) %>%
-    filter(STUDYID == "EPQAC")
-})
+#Separate study datasets
+  #Uganda pharmacometric study
+  epqac <- lapply(files, function(f) {
+    read.csv(f) %>%
+      filter(STUDYID == "EPQAC")
+  })
+
+  #Uganda SMC trial
+  spsnx <- lapply(files, function(f) {
+    read.csv(f) %>%
+      filter(STUDYID == "SPSNX")
+  })
+  
+
 
 #Name by SDTM domain (using names of raw csv files)
   names(epqac) <- basename(files)
-    # - Now I have one dataframe per domain in the epqac object
+  names(spsnx) <- basename(files)
+      # - Now I have one dataframe per domain in the epqac object
   
   dm <- epqac$`DM.csv 2026-03-20.csv`
   vs <- epqac$`VS.csv 2026-03-20.csv`
   pc <- epqac$`PC.csv 2026-03-20.csv`
-
+  sa <- epqac$`SA.csv 2026-03-20.csv`
+  
   
  #DM data
  dm_2 <- prepare_domain(dm,
@@ -81,6 +92,22 @@ epqac <- lapply(files, function(f) {
  names(pc_2)[names(pc_2) == "SULFADXN_\\N"] <- "sfdxn"
  
  
+ #SA data
+ sa_2 <- sa %>% 
+         select("USUBJID", "SASEQ", "SATERM", "SADECOD" ,"SAPRESP", "SAOCCUR", "SAEVINTX")
+
+  
+ sa_2 <- sa_2 %>%
+        mutate(vomit = case_when(
+                   SATERM == "vomited drug" & SAOCCUR == "Y" ~ 1, TRUE ~ 0),
+                   vomit = factor(vomit, levels = c(0, 1), labels = c("No", "Yes")),
+               fever = case_when(
+                 SATERM == "fever" & SAOCCUR == "Y" ~ 1, TRUE ~ 0),
+                 fever = factor(fever, levels = c(0, 1), labels = c("No", "Yes")),
+               ) %>% 
+        filter(SAEVINTX != "ANYTIME DURING FOLLOW-UP") %>% 
+        select("USUBJID", "vomit", "fever")
+ 
  
  
  
@@ -94,12 +121,22 @@ epqac <- lapply(files, function(f) {
                            by = "USUBJID")
  
 
+ dosing_lg <- left_join(dosing_lg,
+                        sa_2,
+                        by = "USUBJID")
+ 
+ 
  #Reshape from long to wide
  dosing_wd <- pivot_wider(
    data = dosing_lg,
-   names_from = "TIME",
+   names_from = c("TIME"),
    values_from = c("aq", "deaq", "ppq", "pyr", "sfdxn")
  )
+ 
+ 
+ dosing_wd <- left_join(dosing_wd,
+                        sa_2,
+                        by = "USUBJID")
   
     #Quick checks for joining
      anti_join(dm_vs, pc_2, by = "USUBJID") #Checks which rows in dm_vs are missing values in pc_2
@@ -194,7 +231,9 @@ epqac <- lapply(files, function(f) {
   # `pyr_Day 7` = "Day 7 PYR (ng/mL)",
   # `pyr_Day 28` = "Day 28 PYR (ng/mL)",
   # `sfdxn_Day 7` = "Day 7 SFDXN (ng/mL)",
-  # `sfdxn_Day 28` = "Day 28 SFDXN (ng/mL)"
+  # `sfdxn_Day 28` = "Day 28 SFDXN (ng/mL)",
+  # vomit = "Vomited drug after treatment",
+  # fever = "Any fever after treatment"
  )
  
  for (var in names(labels)) {
@@ -210,33 +249,77 @@ epqac <- lapply(files, function(f) {
  summary(dosing_wd)
  
  
- ##***** START ANALYSES HERE ***
+
  
+
+# START ANALYSES HERE -----------------------------------------------------
+
  
  #Load analysis datasets
  dosing_wd <- readRDS("output/dosing_wd.rds")
  dosing_lg <- readRDS("output/dosing_lg.rds")
+ 
+ dosing_wd <- dosing_wd %>% 
+                       mutate(age_cat = 
+                           cut(dosing_wd$age,
+                           breaks = c(0, 12, 24, 36, 48, 60),
+                           labels = c("<1 year", "1-2 years", "2-3 years", "3-4 years", "4-5 years"),
+                           right = FALSE))
+ 
+ dosing_wd <- dosing_wd %>% 
+                    mutate(age_cat2 = 
+                        cut(age,
+                         breaks = c(0, 12, Inf),
+                         labels = c("<1 year", "1-5 years"),
+                         right = FALSE))
+ 
+ dosing_wd <- dosing_wd %>% 
+   mutate(aq_overdose = 
+            cut(aq_dose_mgkg,
+                breaks = c(0, 15, Inf),
+                labels = c("No overdose", "overdose"),
+                right = FALSE))
+ 
  
  ggpairs(dosing_wd)
  
  #Age vs AQ (mg/kg)
  ggplot(dosing_wd, aes(x = age, y = aq_dose_mgkg)) +
    geom_point() +
+   geom_hline(yintercept = 10, linetype = "dashed", size = 1) +
+   annotate("rect",
+            xmin = -Inf, xmax = Inf,
+            ymin = 7.5, ymax = 15,
+            fill = "lightblue", alpha = 0.2) +
+   theme_minimal () +
+   theme(
+     panel.grid.minor = element_blank()
+   ) +
    labs(title = "AQ exposure vs age",
         x = "Age (months)", 
         y = "AQ exposure (mg/kg)", 
         )
  
  #Weight vs AQ (mg/kg)
- ggplot(dosing_wd, aes(x = weight, y = aq_dose_mgkg)) +
+ ggplot(dosing_wd, aes(x = weight, y = aq_dose_mgkg, color = age_cat)) +
    geom_point() +
+   geom_hline(yintercept = 10, linetype = "dashed", size = 1) +
+   annotate("rect",
+            xmin = -Inf, xmax = Inf,
+            ymin = 7.5, ymax = 15,
+            fill = "lightblue", alpha = 0.2) +
+   theme_minimal () +
+    theme(
+      panel.grid.minor = element_blank()
+    ) +
    labs(title = "AQ exposure vs weight",
         x = "Weight (kg)", 
-        y = "AQ exposure (mg/kg)", 
+        y = "AQ exposure (mg/kg)",
+        color = "Age"
    )
  
  
- #Weight vs AQ (mg/kg)
+ #Weight vs age
  ggplot(dosing_wd, aes(x = age, y = weight)) +
    geom_point() +
    labs(title = "Age vs weight",
@@ -246,11 +329,11 @@ epqac <- lapply(files, function(f) {
  
  
  #Weight vs MUAC
- ggplot(dosing_wd, aes(x = weight, y = muac)) +
+ ggplot(dosing_wd, aes(x = age, y = muac)) +
    geom_point() +
-   labs(title = "Weight vs MUAC",
-        x = "Age (months)", 
-        y = "Weight (kg)", 
+   labs(title = "MUAC vs age",
+        x = "MUAC (cm)", 
+        y = "Age (months)", 
    )
  
  
@@ -343,9 +426,267 @@ epqac <- lapply(files, function(f) {
  
  
  
+ #Relationship between AQ exposure and vomiting
+ 
+ #Median AQ dose mg/kg by vomiting
+ dosing_wd %>% group_by(vomit) %>% 
+               summarise(median_dose = median(aq_dose_mgkg, na.rm = TRUE))
+ 
+ #Median AQ dose mg/kg by vage groups
+ median_aq_age <- dosing_wd %>% 
+                  filter(!is.na(age_cat)) %>% 
+                  group_by(age_cat) %>% 
+                  summarise(med = median(aq_dose_mgkg, na.rm = TRUE))
+ 
+    #AQ daily dose by age category
+     ggplot(dosing_wd %>% filter(!is.na(age_cat)), 
+            aes(x = aq_dose_mgkg)) +
+       geom_histogram() +
+       geom_vline(data = median_aq_age, 
+                  aes(xintercept = med),
+                  linetype = "dashed", 
+                  color = "red") +
+       geom_text(data = median_aq_age,
+                 aes(x = med, y = Inf, label = round(med, 1)),
+                 color = "red",
+                 vjust = 1.5,
+                 size = 3) +
+       annotate("rect",
+                ymin = -Inf, ymax = Inf,
+                xmin = 7.5, xmax = 15,
+                fill = "lightblue", alpha = 0.2) +
+       facet_wrap(~ age_cat) +
+       theme_minimal() +
+       theme(
+         panel.grid.minor = element_blank()
+       ) +
+       labs(x = "Amodiaquinqe daily dose (mg/kg)",
+            y = "Number of participants")
+   
  
  
+ #Logistic regression
+  
+ #Vomiting vs age
+ vomit_age <- glm(vomit ~ age_cat, 
+                 data = dosing_wd, 
+                 family = binomial)
+ 
+
+ #Vomiting vs AQ daily dose
+      #Continuous AQ dose
+ vomit_aq <- glm(vomit ~ aq_dose_mgkg, 
+                  data = dosing_wd, 
+                  family = binomial)
+
+ vomit_aq1 <- glm(vomit ~ aq_dose_mgkg + age_cat, 
+                 data = dosing_wd, 
+                 family = binomial)
+ 
+        #AQ dose overdose vs no overdose
+ vomit_aq2 <- glm(vomit ~ aq_overdose, 
+                 data = dosing_wd, 
+                 family = binomial)
+ 
+ vomit_aq3 <- glm(vomit ~ aq_overdose + age_cat, 
+                  data = dosing_wd, 
+                  family = binomial)
  
  
+         #--- Plot predicted probability of vomiting
+         
+         #New dataset
+         aq_dose_df <- data.frame(   
+           aq_dose_mgkg = seq(
+                           min(dosing_wd$aq_dose_mgkg, na.rm = TRUE),
+                           max(dosing_wd$aq_dose_mgkg, na.rm = TRUE),
+                           length.out = 100) #,
+                         #age_cat = levels (dosing_wd$age_cat)
+                         )
+         
+         #Predicted probability of vomiting
+         pred_prob <- predict(
+           vomit_aq,
+           newdata = aq_dose_df,
+           type = "link", #Gives log-odds
+           se.fit = TRUE,
+         )
+         
+             #Dataframe for plot
+             aq_dose_df$fit <- pred_prob$fit
+             aq_dose_df$se <- pred_prob$se
+             aq_dose_df$prob <- plogis(aq_dose_df$fit)
+             aq_dose_df$lower <- plogis(aq_dose_df$fit - 1.96 * aq_dose_df$se)
+             aq_dose_df$upper <- plogis(aq_dose_df$fit + 1.96 * aq_dose_df$se)
+        
+             
+         #Plot predicted probabilities
+         ggplot(aq_dose_df, aes(x = aq_dose_mgkg, y = prob)) +
+            geom_line(size = 1) +
+           geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+           labs(
+             x = "AQ dose (mg/kg)",
+             y = "Predicted probability of vomiting"
+             #color = "Age group") 
+             ) +
+           theme_minimal()
  
  
+          #--- Forest plot showing logistic regression output
+          vomit_results <- bind_rows(
+              tidy(vomit_age, conf.int = TRUE) %>% mutate(model = "Age"),
+              tidy(vomit_aq, conf.int = TRUE) %>% mutate(model = "AQ daily dose (unadjusted)"),
+              tidy(vomit_aq1, conf.int = TRUE) %>% mutate(model = "AQ daily dose (age-adjusted)"),
+              tidy(vomit_aq2, conf.int = TRUE) %>% mutate(model = "AQ overdose (unadjusted)"),
+              tidy(vomit_aq3, conf.int = TRUE) %>% mutate(model = "AQ overdose (age-adjusted)")
+              ) %>% 
+              filter(term != "(Intercept)") %>% 
+              mutate(OR = exp(estimate),
+                     lower = exp(conf.low),
+                     upper = exp(conf.high)
+                     )
+            
+          #Age dataframe
+          age_plot <- vomit_results %>%
+            filter(model == "Age", term != "(Intercept)") %>%
+            mutate(
+              label = str_replace(term, "^age_cat", "Age: ")
+            ) %>%
+            select(label, OR, lower, upper)
+          
+          
+          #AQ dose dataframe
+          dose_plot <- vomit_results %>%
+            filter(
+              model %in% c("AQ daily dose (unadjusted)", "AQ daily dose (age-adjusted)"),
+              term == "aq_dose_mgkg"
+            ) %>%
+            mutate(
+              label = model
+            ) %>%
+            select(label, OR, lower, upper)
+          
+          
+          #AQ overdose dataframe
+          overdose_plot <- vomit_results %>%
+            filter(
+              model %in% c("AQ overdose (unadjusted)", "AQ overdose (age-adjusted)"),
+              str_detect(term, "^aq_overdose")
+            ) %>%
+            mutate(
+              label = model
+            ) %>%
+            select(label, OR, lower, upper)
+          
+          
+          #Compiled dataframe
+          forest_df <- bind_rows(
+            age_plot,
+            tibble(label = " ", OR = NA_real_, lower = NA_real_, upper = NA_real_),
+            dose_plot,
+            tibble(label = "  ", OR = NA_real_, lower = NA_real_, upper = NA_real_),
+            overdose_plot
+          ) %>%
+            mutate(
+              label = factor(
+                label,
+                levels = c(
+                  "Age: 1-2 years",
+                  "Age: 2-3 years",
+                  "Age: 3-4 years",
+                  "Age: 4-5 years",
+                  " ",
+                  "AQ daily dose (unadjusted)",
+                  "AQ daily dose (age-adjusted)",
+                  "  ",
+                  "AQ overdose (unadjusted)",
+                  "AQ overdose (age-adjusted)"
+                )
+              )
+            )
+          
+          
+          #Forest plot
+          ggplot(forest_df, aes(x = OR, y = fct_rev(label))) +
+            geom_point(size = 2, na.rm = TRUE) +
+            geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.2, na.rm = TRUE) +
+            geom_vline(xintercept = 1, linetype = "dashed") +
+            scale_x_log10() +
+            labs(
+              x = "Odds ratio (log scale)",
+              y = NULL,
+              title = "Odds of vomiting after AQ exposure"
+            ) +
+            theme_minimal() +
+            theme(
+              panel.grid.minor = element_blank(),
+              axis.text.y = element_text(size = 10)
+            )  
+          
+          
+          
+
+# DAY 28 DEAQ -----------------------------------------------------
+          dosing_wd$log_deaq_d28 <- log(dosing_wd$`deaq_Day 28`)
+          
+          
+          
+          
+          #D28 DEAQ vs Age
+          ggplot(dosing_wd, aes(x = age, y = `deaq_Day 28`, color = aq_dose_mgkg)) +
+            geom_point() +
+            scale_color_viridis_c(direction = -1) +
+            labs(title = "Day 28 Desethylamodiaquine vs age",
+                 x = "Age (months)", 
+                 y = "D28 DEAQ concentration (ng/mL)", 
+            ) +
+            theme_minimal() +
+            theme(
+              panel.grid.minor = element_blank(),
+              axis.text.y = element_text(size = 10))
+          
+          
+          ggplot(dosing_wd, aes(x = muac, y = log_deaq_d28, color = aq_dose_mgkg)) +
+            geom_point() +
+            scale_color_viridis_c(direction = -1) +
+            labs(title = "Log Day 28 DEAQ vs MUAC",
+                 x = "MUAC (cm)", 
+                 y = "Log D28 DEAQ (ng/mL)", 
+            ) +
+            theme_minimal() +
+            theme(
+              panel.grid.minor = element_blank(),
+              axis.text.y = element_text(size = 10))
+          
+          
+          
+              
+          #D28 DEAQ vs weight
+          ggplot(dosing_wd, aes(x = weight, y = `deaq_Day 28`, color = aq_dose_mgkg)) +
+            geom_point() +
+            scale_color_viridis_c(direction = -1) +
+            labs(title = "Day 28 Desethylamodiaquine vs weight",
+                 x = "Weight (kg)", 
+                 y = "D28 DEAQ concentration (ng/mL)", 
+            ) +
+            theme_minimal() +
+            theme(
+              panel.grid.minor = element_blank(),
+              axis.text.y = element_text(size = 10))
+          
+          #D28 DEAQ vs MUAC
+          ggplot(dosing_wd, aes(x = muac, y = `deaq_Day 28`, color = aq_dose_mgkg)) +
+            geom_point() +
+            scale_color_viridis_c(direction = -1) +
+            labs(title = "Day 28 Desethylamodiaquine vs MUAC",
+                 x = "MUAC (cm)", 
+                 y = "D28 DEAQ concentration (ng/mL)", 
+            ) +
+            theme_minimal() +
+            theme(
+              panel.grid.minor = element_blank(),
+              axis.text.y = element_text(size = 10))
+          
+          
+           
+          
