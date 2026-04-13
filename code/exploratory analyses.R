@@ -9,6 +9,8 @@ library(iddoverse)
 library(labelled)
 library(ggplot2)
 library(GGally)
+library(haven)
+library(skimr)
 
 
 #Clean SDTM dataset by each domain 
@@ -688,5 +690,76 @@ files <- list.files("data/raw", pattern = "\\.csv$", full.names = TRUE)
               axis.text.y = element_text(size = 10))
           
           
-           
+
+# DHS / MIS dataset analyses ----------------------------------------------------
+
+#Ugandan 
+  #MIS 2024     
+     ug_mis_2024 <- read_dta("UGKR91FL.dta")      
+                    
+          #View variables
+          sapply(mis_2024, attr, "label")  
+
+  
+ #DHS 2016
+    ug_dhs_2024 <- read_dta("UGKR7BFL.DTA")        
+     
+    #Age  data
+    ug_dhs_2024_age <- ug_dhs_2024 %>% 
+                       select(caseid, midx,
+                              b1:b8,
+                              b17,
+                              b19)
+    
+    #Weight data
+    ug_dhs_2024_hw <- ug_dhs_2024 %>% 
+                      select(caseid, midx, hwidx, #identifiers
+                             hw1:hw3, #height/weight
+                             hw13, hw15, #height/length
+                             hw17:hw19, #date of measurement
+                             hw53:hw57) #hemoglobin data
+    
+    #Merge - Uganda 2024 anthropometric dataset
+    ug_2024_anthro <- left_join(ug_dhs_2024_age, 
+                                ug_dhs_2024_hw, 
+                                by = c("caseid", "midx"))
+          
+    
+    #Clean dataset
+    
+    #Alive children
+    ug_2024_anthro <- ug_2024_anthro %>% 
+                      filter(b5 != 0) %>% #keep alive
+                      select(-b6, -b7)    #remove dead related questions
+
+    #Age variable
+    skim(ug_2024_anthro$b19) #No missing age
+    summary(ug_2024_anthro$b19)          
+    
+    
+    #Weight variable
+    skim(ug_2024_anthro$hw2) #70% data missing
+    
+    ug_2024_anthro <- ug_2024_anthro %>% 
+                      filter(!is.na(hw2)) %>% #Drop missing weight
+                      mutate(age_mo = b19) %>% #age in months
+                      filter (age_mo >= 3) %>% #Drop children less than 3 months
+                      mutate(weight_kg = hw2 / 10) %>%  #Correct units for weight
+                      mutate(height_cm = hw3 / 10) %>%  #Correct units for height
+                      mutate(hb = hw53 / 10) %>%  #Correct units for hb
+                      mutate(hb_corrected = hw56 / 10)  #Correct units for hb
+
+    sum(ug_2024_anthro$hb_corrected < 8, na.rm = TRUE)
+    
+    skim(ug_2024_anthro$hb_corrected)      
+    
+    
+    
+    
+    
+    
+    
+    
+          
+          
           
